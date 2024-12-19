@@ -246,6 +246,46 @@ openimageio_cuda();
 OIIO_API bool
 gpu_attribute(string_view name, TypeDesc type, const void* val);
 
+// Set an attribute related to OIIO's use of GPUs/compute devices. This is a
+// strictly internal function. User code should just call OIIO::attribute()
+// and GPU-related attributes will be directed here automatically.
+template <typename T>
+OIIO_API bool
+gpu_attribute(string_view name, T val)
+{
+    if constexpr (name == "gpu:device") {
+
+        if constexpr (std::is_convertible_v<T, string_view>) {
+            // If requesting a device by name, find the index of the name in the
+            // list of device names and then request the device by index.
+            int i = 0;
+            for (auto& n : device_type_names) {
+                if (Strutil::iequals(val, n))
+                    return gpu_attribute("gpu:device", i);
+                ++i;
+            }
+            return false;
+        }
+    }
+    if constexpr (name == "gpu:device") {
+
+        if constexpr (std::is_convertible_v<T, int>) {
+            ComputeDevice request = ComputeDevice(val);
+            if (request == oiio_compute_device)
+                return true;  // Already using the requested device
+            if (request == ComputeDevice::CUDA) {
+                if (enable_cuda()) {
+                    oiio_compute_device = request;
+                    return true;
+                }
+            }
+            return false;  // Unsatisfiable request
+        }
+    }
+
+    return false;
+}
+
 // Retrieve an attribute related to OIIO's use of GPUs/compute devices. This
 // is a strictly internal function. User code should just call
 // OIIO::getattribute() and GPU-related attributes will be directed here

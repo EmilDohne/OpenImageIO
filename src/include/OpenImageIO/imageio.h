@@ -2998,6 +2998,368 @@ inline bool attribute (string_view name, string_view val) {
     return attribute (name, TypeString, &s);
 }
 
+/// `OIIO::attribute()` sets a global attribute (i.e., a property or
+/// option) of OpenImageIO. The `name` designates the name of the attribute
+/// and `val` is the value you are trying to set.
+///
+/// If the name is a known, valid attribute that matches the type specified,
+/// the attribute will be set to the new value and `attribute()` will return
+/// `true`.  If `name` is not recognized, or if the types do not match
+/// (e.g., `T` is `float` but the named attribute is a string), the
+/// attribute will not be modified, and `attribute()` will return `false`.
+///
+/// The following are the recognized attributes:
+///
+/// - `string options`
+///
+///    This catch-all is simply a comma-separated list of `name=value`
+///    settings of named options, which will be parsed and individually set.
+///    For example,
+///
+///        OIIO::attribute ("options", "threads=4,log_times=1");
+///
+///    Note that if an option takes a string value that must itself contain
+///    a comma, it is permissible to enclose the value in either 'single'
+///    or "double" quotes.
+///
+/// - `int threads`
+///
+///    How many threads to use for operations that can be sped up by being
+///    multithreaded. (Examples: simultaneous format conversions of multiple
+///    scanlines read together, or many ImageBufAlgo operations.) The
+///    default is 0, meaning to use the full available hardware concurrency
+///    detected.
+///
+///    Situations where the main application logic is essentially single
+///    threaded (i.e., one top-level call into OIIO at a time) should leave
+///    this at the default value, or some reasonable number of cores, thus
+///    allowing lots of threads to fill the cores when OIIO has big tasks to
+///    complete. But situations where you have many threads at the
+///    application level, each of which is expected to be making separate
+///    OIIO calls simultaneously, should set this to 1, thus having each
+///    calling thread do its own work inside of OIIO rather than spawning
+///    new threads with a high overall "fan out."
+///
+/// - `int exr_threads`
+///
+///    Sets the internal OpenEXR thread pool size. The default is to use as
+///    many threads as the amount of hardware concurrency detected. Note
+///    that this is separate from the OIIO `"threads"` attribute.
+///
+/// - `string font_searchpath`
+///
+///    Colon-separated (or semicolon-separated) list of directories to search
+///    if fonts are needed. (Such as for `ImageBufAlgo::render_text()`.)
+///
+/// - `int use_tbb`
+///
+///    If nonzero and TBB was found and support configured when OIIO was
+///    compiled, parallel processing within OIIO (including inside the
+///    parallel.h utilities) will try to use TBB by default where possible.
+///    If zero, they will try to use OIIO's native thread pool even if TBB
+///    is available.
+///
+/// - `string plugin_searchpath`
+///
+///    Colon-separated (or semicolon-separated) list of directories to search
+///    for dynamically-loaded format plugins.
+///
+/// - `int try_all_readers`
+///
+///    When nonzero (the default), a call to `ImageInput::create()` or
+///    `ImageInput::open()` that does not succeed in opening the file with the
+///    format reader implied by the file extension will try all available
+///    format readers to see if one of them can open the file. If this is
+///    zero, the only reader that will be tried is the one implied by the file
+///    extension.
+///
+/// - `int read_chunk`
+///
+///    When performing a `read_image()`, this is the number of scanlines it
+///    will attempt to read at a time (some formats are more efficient when
+///    reading and decoding multiple scanlines).  The default is 256. The
+///    special value of 0 indicates that it should try to read the whole
+///    image if possible.
+///
+/// - `span<float> missingcolor`, `string missingcolor`
+///
+///    This attribute may either be an array of float values, or a string
+///    containing a comma-separated list of the values. Setting this option
+///    globally is equivalent to always passing an `ImageInput`
+///    open-with-configuration hint `"oiio:missingcolor"` with the value.
+///
+///    When set, it gives some `ImageInput` readers the option of ignoring
+///    any *missing* tiles or scanlines in the file, and instead of treating
+///    the read failure of an individual tile as a full error, will
+///    interpret is as an intentionally missing tile and proceed by simply
+///    filling in the missing pixels with the color specified. If the first
+///    element is negative, it will use the absolute value, but draw
+///    alternating diagonal stripes of the color. For example,
+///
+///        std::array<float, 4> missing = { -1.0, 0.0, 0.0, 0.0 }; // striped red
+///        OIIO::attribute ("missingcolor", span<T>(missing.begin(), missing.end()));
+///
+///    Note that only some file formats support files with missing tiles or
+///    scanlines, and this is only taken as a hint. Please see
+///    chap-bundledplugins_ for details on which formats accept a
+///    `"missingcolor"` configuration hint.
+///
+/// - `int debug`
+///
+///    When nonzero, various debug messages may be printed. The default is 0
+///    for release builds, 1 for DEBUG builds (values > 1 are for OIIO
+///    developers to print even more debugging information), This attribute
+///    but also may be overridden by the OPENIMAGEIO_DEBUG environment
+///    variable.
+///
+/// - `int tiff:half`
+///
+///    When nonzero, allows TIFF to write `half` pixel data. N.B. Most apps
+///    may not read these correctly, but OIIO will. That's why the default
+///    is not to support it.
+///
+/// - `int dds:bc5normal`
+///
+///    When nonzero, treats BC5/ATI2 format files as normal maps (loads as
+///    3 channels, computes blue from red and green). Default is 0.
+///
+/// - `int openexr:core`
+///
+///    When nonzero, use the new "OpenEXR core C library" when available,
+///    for OpenEXR >= 3.1. This is experimental, and currently defaults to 0.
+///
+/// - `int jpeg:com_attributes`
+///
+///    When nonzero, try to parse JPEG comment blocks as key-value attributes,
+///    and only set ImageDescription if the parsing fails. Otherwise, always
+///    set ImageDescription to the first comment block. Default is 1.
+///
+///
+/// - `int limits:channels` (1024)
+///
+///    When nonzero, the maximum number of color channels in an image. Image
+///    files whose headers indicate they have more channels might be assumed
+///    to be corrupted or malicious files.  In situations when more channels
+///    are expected to be encountered, the application should raise this
+///    limit. The default is 1024 channels.
+///
+/// - `int limits:imagesize_MB` (32768)
+///
+///    When nonzero, the maximum expected size in MB of the uncompressed pixel
+///    data of a single 2D image. Images whose headers indicate that they are
+///    larger than this might be assumed to be corrupted or malicious files.
+///    The default is 32768 (32 GB of uncompressed pixel data -- equivalent to
+///    64k x 64k x 4 channel x half), or the total amount of total physical
+///    memory available to the running process, whichever is smaller. In
+///    situations when images larger than this are expected to be encountered,
+///    you should raise this limit. Setting the limit to 0 means having no
+///    limit.
+///
+/// - `int log_times` (0)
+///
+///    When the `"log_times"` attribute is nonzero, `ImageBufAlgo` functions
+///    are instrumented to record the number of times they were called and
+///    the total amount of time spent executing them. It can be overridden
+///    by environment variable `OPENIMAGEIO_LOG_TIMES`. The totals will be
+///    recorded and can be retrieved as a string by using
+///    `OIIO::getattribute("timing_report", ...)`. Additionally, if the
+///    value is 2 or more, the timing report will be printed to `stdout`
+///    upon application exit (not advised in contexts where it isn't ok to
+///    print to the terminal via stdout, such as GUI apps or libraries).
+///
+///    When enabled, there is a slight runtime performance cost due to
+///    checking the time at the start and end of each of those function
+///    calls, and the locking and recording of the data structure that holds
+///    the log information. When the `log_times` attribute is disabled,
+///    there is no additional performance cost.
+///
+/// - `oiio:print_uncaught_errors` (1)
+///
+///   If nonzero, upon program exit, any error messages that would have been
+///   retrieved by a call to `OIIO::geterror()`, but never were, will be
+///   printed to stdout. While this may seem chaotic, we are presuming that
+///   any well-written library or application will proactively check error
+///   codes and retrieve errors, so this will never print anything upon exit.
+///   But for less sophisticated applications (or users), this is very useful
+///   for forcing display of error messages so that users can see relevant
+///   errors even if they never check them explicitly, thus self-diagnose
+///   their troubles before asking the project dev deam for help. Advanced
+///   users who for some reason desire to neither retrieve errors themselves
+///   nor have them printed in this manner can disable the behavior by setting
+///   this attribute to 0.
+///
+/// - `imagebuf:print_uncaught_errors` (1)
+///
+///   If nonzero, an `ImageBuf` upon destruction will print any error messages
+///   that were never retrieved by its `geterror()` method. While this may
+///   seem chaotic, we are presuming that any well-written library or
+///   application will proactively check error codes and retrieve errors, so
+///   will never print anything upon destruction. But for less sophisticated
+///   applications (or users), this is very useful for forcing display of
+///   error messages so that users can see relevant errors even if they never
+///   check them explicitly, thus self-diagnose their troubles before asking
+///   the project dev deam for help. Advanced users who for some reason desire
+///   to neither retrieve errors themselves nor have them printed in this
+///   manner can disable the behavior by setting this attribute to 0.
+///
+/// - `imagebuf:use_imagecache` (0)
+///
+///   If nonzero, an `ImageBuf` that references a file but is not given an
+///   ImageCache will read the image through the default ImageCache.
+///
+template <typename T>
+OIIO_API bool attribute(string_view name, T val) {
+
+    if constexpr (name == "options") {
+
+        if constexpr (std::is_convertible_v<T, std::string> || std::is_convertible_v<T, string_view>) {
+            GlobalOptSetter gos;
+            return optparser(gos, val);
+        }
+
+    }
+    if constexpr (name == "threads") {
+
+        if constexpr (std::is_convertible_v<T, int>) {
+            int num_threads = OIIO::clamp<int>(val, 0, maxthreads);
+            if (num_threads == 0)
+                num_threads = threads_default();
+            oiio_threads = num_threads;
+            default_thread_pool()->resize(num_threads - 1);
+            return true;
+        }
+
+    }
+    if (Strutil::starts_with(name, "gpu:")
+        || Strutil::starts_with(name, "cuda:")) {
+        return pvt::gpu_attribute(name, val);
+    }
+
+    // Things below here need to guarded by the attrib_mutex
+    spin_lock lock(attrib_mutex);
+
+    if constexpr (std::is_convertible_v<T, int>) {
+
+        if constexpr (name == "read_chunk") {
+            oiio_read_chunk = val;
+            return true;
+        }
+        if constexpr (name == "exr_threads") {
+            oiio_exr_threads = OIIO::clamp<int>(val, -1, maxthreads);
+            return true;
+        }
+        if constexpr (name == "openexr:core") {
+            openexr_core = val;
+            return true;
+        }
+        if constexpr (name == "jpeg:com_attributes") {
+            jpeg_com_attributes = val;
+            return true;
+        }
+        if constexpr (name == "tiff:half") {
+            tiff_half = val;
+            return true;
+        }
+        if constexpr (name == "tiff:multithread") {
+            tiff_multithread = val;
+            return true;
+        }
+        if constexpr (name == "dds:bc5normal") {
+            dds_bc5normal = val;
+            return true;
+        }
+        if constexpr (name == "limits:channels") {
+            limit_channels = val;
+            return true;
+        }
+        if constexpr (name == "limits:imagesize_MB") {
+            limit_imagesize_MB = val;
+            return true;
+        }
+        if constexpr (name == "oiio:print_uncaught_errors") {
+            oiio_print_uncaught_errors = val;
+            return true;
+        }
+        if constexpr (name == "imagebuf:print_uncaught_errors") {
+            imagebuf_print_uncaught_errors = val;
+            return true;
+        }
+        if constexpr (name == "imagebuf:use_imagecache") {
+            imagebuf_use_imagecache = val;
+            return true;
+        }
+        if constexpr (name == "use_tbb") {
+            oiio_use_tbb = val;
+            return true;
+        }
+        if constexpr (name == "debug") {
+            oiio_print_debug = val;
+            return true;
+        }
+        if constexpr (name == "log_times") {
+            oiio_log_times = val;
+            return true;
+        }
+        if constexpr (name == "try_all_readers") {
+            oiio_try_all_readers = val;
+            return true;
+        }
+
+    } // if constexpr (std::is_convertible_v<T, int>)
+
+    if constexpr (name == "font_searchpath") {
+
+        // Add a shortcut here at compile time if we already have a ustring avoiding instantiation.
+        if constexpr (std::is_convertible_v<T, string_view> || std::is_convertible_v<T, const char*>) {
+            font_searchpath = ustring(val);
+            return true;
+        }
+        else if constexpr (std::is_same_v<T, ustring>) {
+            font_searchpath = ustring(val);
+            return true;
+        }
+
+    }
+    if constexpr (name == "plugin_searchpath") {
+
+        // Add a shortcut here at compile time if we already have a ustring avoiding instantiation.
+        if constexpr (std::is_convertible_v<T, string_view> || std::is_convertible_v<T, const char*>) {
+            plugin_searchpath = ustring(val);
+            return true;
+        else if constexpr (std::is_same_v<T, ustring>) {
+            plugin_searchpath = val;
+            return true;
+        }
+
+    }
+    
+    if constexpr (name == "missingcolor") {
+        // missingcolor as string
+        if constexpr (std::is_convertible_v<T, string_view> || std::is_convertible_v<T, const char*>) {
+            oiio_missingcolor = Strutil::extract_from_list_string<float>(val);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/// Shortcut attribute() for setting an array type
+template <typename T>
+OIIO_API bool attribute(string_view name, span<T> val) {
+
+    if constexpr (name == "missingcolor") {
+
+        if constexpr (std::is_convertible_v<T, float>) {
+            // missingcolor as float array
+            oiio_missingcolor = std::vector<T>(val.begin(), val.end());
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /// Get the named global attribute of OpenImageIO, store it in `*val`.
 /// Return `true` if found and it was compatible with the type specified,
 /// otherwise return `false` and do not modify the contents of `*val`.  It
