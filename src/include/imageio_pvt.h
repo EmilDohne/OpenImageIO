@@ -25,6 +25,10 @@ struct PixelStats;
 
 namespace pvt {
 
+// Hidden global OIIO data.
+static spin_mutex attrib_mutex;
+static constexpr int maxthreads = 512;  // reasonable maximum for sanity check
+
 // Mutex allowing thread safety of the ImageIO internals below
 extern std::recursive_mutex imageio_mutex;
 

@@ -70,9 +70,6 @@ using namespace pvt;
 
 
 namespace {
-// Hidden global OIIO data.
-static spin_mutex attrib_mutex;
-static const int maxthreads = 512;  // reasonable maximum for sanity check
 
 class TimingLog {
 public:
@@ -333,7 +330,7 @@ attribute(string_view name, TypeDesc type, const void* val)
         return optparser(gos, *(const char**)val);
     }
     if (name == "threads" && type == TypeInt) {
-        int ot = OIIO::clamp(*(const int*)val, 0, maxthreads);
+        int ot = OIIO::clamp(*(const int*)val, 0, pvt::maxthreads);
         if (ot == 0)
             ot = threads_default();
         oiio_threads = ot;
@@ -346,7 +343,7 @@ attribute(string_view name, TypeDesc type, const void* val)
     }
 
     // Things below here need to buarded by the attrib_mutex
-    spin_lock lock(attrib_mutex);
+    spin_lock lock(pvt::attrib_mutex);
     if (name == "read_chunk" && type == TypeInt) {
         oiio_read_chunk = *(const int*)val;
         return true;
@@ -360,7 +357,7 @@ attribute(string_view name, TypeDesc type, const void* val)
         return true;
     }
     if (name == "exr_threads" && type == TypeInt) {
-        oiio_exr_threads = OIIO::clamp(*(const int*)val, -1, maxthreads);
+        oiio_exr_threads = OIIO::clamp(*(const int*)val, -1, pvt::maxthreads);
         return true;
     }
     if (name == "openexr:core" && type == TypeInt) {
@@ -455,7 +452,7 @@ getattribute(string_view name, TypeDesc type, void* val)
     }
 
     // Things below here need to buarded by the attrib_mutex
-    spin_lock lock(attrib_mutex);
+    spin_lock lock(pvt::attrib_mutex);
     if (name == "read_chunk" && type == TypeInt) {
         *(int*)val = oiio_read_chunk;
         return true;

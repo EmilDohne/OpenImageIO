@@ -3223,7 +3223,7 @@ OIIO_API bool attribute(string_view name, T val) {
     if (name == "threads") {
 
         if constexpr (std::is_convertible_v<T, int>) {
-            int num_threads = OIIO::clamp<int>(val, 0, maxthreads);
+            int num_threads = OIIO::clamp<int>(val, 0, pvt::maxthreads);
             if (num_threads == 0)
                 num_threads = threads_default();
             pvt::oiio_threads = num_threads;
@@ -3238,7 +3238,7 @@ OIIO_API bool attribute(string_view name, T val) {
     }
 
     // Things below here need to guarded by the attrib_mutex
-    spin_lock lock(attrib_mutex);`
+    spin_lock lock(pvt::attrib_mutex);
 
     if constexpr (std::is_convertible_v<T, int>) {
 
@@ -3247,7 +3247,7 @@ OIIO_API bool attribute(string_view name, T val) {
             return true;
         }
         if (name == "exr_threads") {
-            pvt::oiio_exr_threads = OIIO::clamp<int>(val, -1, maxthreads);
+            pvt::oiio_exr_threads = OIIO::clamp<int>(val, -1, pvt::maxthreads);
             return true;
         }
         if (name == "openexr:core") {
