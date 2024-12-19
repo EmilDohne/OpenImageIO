@@ -6,6 +6,7 @@ dist/
 ext/
 .idea
 .vscode
+.vs
 .cproject
 .project
 .DS_Store
