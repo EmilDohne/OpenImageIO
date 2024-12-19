@@ -38,6 +38,8 @@
 #include <OpenImageIO/typedesc.h>
 #include <OpenImageIO/memory.h>
 
+#include "imageio_pvt.h"
+
 OIIO_NAMESPACE_BEGIN
 
 class DeepData;
@@ -3210,7 +3212,7 @@ inline bool attribute (string_view name, string_view val) {
 template <typename T>
 OIIO_API bool attribute(string_view name, T val) {
 
-    if constexpr (name == "options") {
+    if (name == "options") {
 
         if constexpr (std::is_convertible_v<T, std::string> || std::is_convertible_v<T, string_view>) {
             GlobalOptSetter gos;
@@ -3218,13 +3220,13 @@ OIIO_API bool attribute(string_view name, T val) {
         }
 
     }
-    if constexpr (name == "threads") {
+    if (name == "threads") {
 
         if constexpr (std::is_convertible_v<T, int>) {
             int num_threads = OIIO::clamp<int>(val, 0, maxthreads);
             if (num_threads == 0)
                 num_threads = threads_default();
-            oiio_threads = num_threads;
+            pvt::oiio_threads = num_threads;
             default_thread_pool()->resize(num_threads - 1);
             return true;
         }
@@ -3236,107 +3238,107 @@ OIIO_API bool attribute(string_view name, T val) {
     }
 
     // Things below here need to guarded by the attrib_mutex
-    spin_lock lock(attrib_mutex);
+    spin_lock lock(attrib_mutex);`
 
     if constexpr (std::is_convertible_v<T, int>) {
 
-        if constexpr (name == "read_chunk") {
-            oiio_read_chunk = val;
+        if (name == "read_chunk") {
+            pvt::oiio_read_chunk = val;
             return true;
         }
-        if constexpr (name == "exr_threads") {
-            oiio_exr_threads = OIIO::clamp<int>(val, -1, maxthreads);
+        if (name == "exr_threads") {
+            pvt::oiio_exr_threads = OIIO::clamp<int>(val, -1, maxthreads);
             return true;
         }
-        if constexpr (name == "openexr:core") {
-            openexr_core = val;
+        if (name == "openexr:core") {
+            pvt::openexr_core = val;
             return true;
         }
-        if constexpr (name == "jpeg:com_attributes") {
-            jpeg_com_attributes = val;
+        if (name == "jpeg:com_attributes") {
+            pvt::jpeg_com_attributes = val;
             return true;
         }
-        if constexpr (name == "tiff:half") {
-            tiff_half = val;
+        if (name == "tiff:half") {
+            pvt::tiff_half = val;
             return true;
         }
-        if constexpr (name == "tiff:multithread") {
-            tiff_multithread = val;
+        if (name == "tiff:multithread") {
+            pvt::tiff_multithread = val;
             return true;
         }
-        if constexpr (name == "dds:bc5normal") {
-            dds_bc5normal = val;
+        if (name == "dds:bc5normal") {
+            pvt::dds_bc5normal = val;
             return true;
         }
-        if constexpr (name == "limits:channels") {
-            limit_channels = val;
+        if (name == "limits:channels") {
+            pvt::limit_channels = val;
             return true;
         }
-        if constexpr (name == "limits:imagesize_MB") {
-            limit_imagesize_MB = val;
+        if (name == "limits:imagesize_MB") {
+            pvt::limit_imagesize_MB = val;
             return true;
         }
-        if constexpr (name == "oiio:print_uncaught_errors") {
-            oiio_print_uncaught_errors = val;
+        if (name == "oiio:print_uncaught_errors") {
+            pvt::oiio_print_uncaught_errors = val;
             return true;
         }
-        if constexpr (name == "imagebuf:print_uncaught_errors") {
-            imagebuf_print_uncaught_errors = val;
+        if (name == "imagebuf:print_uncaught_errors") {
+            pvt::imagebuf_print_uncaught_errors = val;
             return true;
         }
-        if constexpr (name == "imagebuf:use_imagecache") {
-            imagebuf_use_imagecache = val;
+        if (name == "imagebuf:use_imagecache") {
+            pvt::imagebuf_use_imagecache = val;
             return true;
         }
-        if constexpr (name == "use_tbb") {
-            oiio_use_tbb = val;
+        if (name == "use_tbb") {
+            pvt::oiio_use_tbb = val;
             return true;
         }
-        if constexpr (name == "debug") {
-            oiio_print_debug = val;
+        if (name == "debug") {
+            pvt::oiio_print_debug = val;
             return true;
         }
-        if constexpr (name == "log_times") {
-            oiio_log_times = val;
+        if (name == "log_times") {
+            pvt::oiio_log_times = val;
             return true;
         }
-        if constexpr (name == "try_all_readers") {
-            oiio_try_all_readers = val;
+        if (name == "try_all_readers") {
+            pvt::oiio_try_all_readers = val;
             return true;
         }
 
     } // if constexpr (std::is_convertible_v<T, int>)
 
-    if constexpr (name == "font_searchpath") {
+    if (name == "font_searchpath") {
 
         // Add a shortcut here at compile time if we already have a ustring avoiding instantiation.
         if constexpr (std::is_convertible_v<T, string_view> || std::is_convertible_v<T, const char*>) {
-            font_searchpath = ustring(val);
+            pvt::font_searchpath = ustring(val);
             return true;
         }
         else if constexpr (std::is_same_v<T, ustring>) {
-            font_searchpath = ustring(val);
+            pvt::font_searchpath = ustring(val);
             return true;
         }
 
     }
-    if constexpr (name == "plugin_searchpath") {
+    if (name == "plugin_searchpath") {
 
         // Add a shortcut here at compile time if we already have a ustring avoiding instantiation.
         if constexpr (std::is_convertible_v<T, string_view> || std::is_convertible_v<T, const char*>) {
-            plugin_searchpath = ustring(val);
+            pvt::plugin_searchpath = ustring(val);
             return true;
         else if constexpr (std::is_same_v<T, ustring>) {
-            plugin_searchpath = val;
+            pvt::plugin_searchpath = val;
             return true;
         }
 
     }
     
-    if constexpr (name == "missingcolor") {
+    if (name == "missingcolor") {
         // missingcolor as string
         if constexpr (std::is_convertible_v<T, string_view> || std::is_convertible_v<T, const char*>) {
-            oiio_missingcolor = Strutil::extract_from_list_string<float>(val);
+            pvt::oiio_missingcolor = Strutil::extract_from_list_string<float>(val);
             return true;
         }
     }
@@ -3348,11 +3350,11 @@ OIIO_API bool attribute(string_view name, T val) {
 template <typename T>
 OIIO_API bool attribute(string_view name, span<T> val) {
 
-    if constexpr (name == "missingcolor") {
+    if (name == "missingcolor") {
 
         if constexpr (std::is_convertible_v<T, float>) {
             // missingcolor as float array
-            oiio_missingcolor = std::vector<T>(val.begin(), val.end());
+            pvt::oiio_missingcolor = std::vector<T>(val.begin(), val.end());
             return true;
         }
     }
